@@ -48,8 +48,7 @@ fun BasicChipYellowPreview() {
     )
 }
 
-@Preview(name = "Basic Chip Blue Light", group = "Chips", uiMode = UI_MODE_NIGHT_NO)
-@Preview(name = "Basic Chip Blue Dark", group = "Chips", uiMode = UI_MODE_NIGHT_YES)
+@MultiPreview
 @Composable
 fun BasicChipBluePreview() {
     BasicChip(
@@ -59,8 +58,7 @@ fun BasicChipBluePreview() {
 }
 
 
-@ShowkaseComposable(name = "Basic Chip Grey Light", group = "Chips")
-@ShowkaseComposable(name = "Basic Chip Grey Dark", group = "Chips")
+@MultiPreview
 @Composable
 fun BasicChipGreyPreview() {
     BasicChip(
@@ -68,3 +66,7 @@ fun BasicChipGreyPreview() {
         modifier = Modifier.background(color = Color.Gray)
     )
 }
+
+@Preview(name = "Light", group = "Chips", uiMode = UI_MODE_NIGHT_NO)
+@Preview(name = "Dark", group = "Chips", uiMode = UI_MODE_NIGHT_YES)
+annotation class MultiPreview

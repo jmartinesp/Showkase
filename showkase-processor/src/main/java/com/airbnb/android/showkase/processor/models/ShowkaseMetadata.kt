@@ -357,7 +357,7 @@ internal fun getShowkaseMetadataFromCustomAnnotation(
             element = element,
             previewParameterName = previewParameterMetadata?.first,
             previewParameterProviderType = previewParameterMetadata?.second,
-            componentIndex = index,
+            componentIndex = -1,
         )
     }
 }

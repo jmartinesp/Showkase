@@ -100,7 +100,8 @@ class ShowkaseProcessor @JvmOverloads constructor(
         val showkaseComposablesMetadata = processShowkaseAnnotation(roundEnvironment)
         val previewComposablesMetadata = processPreviewAnnotation(roundEnvironment)
 
-        val customPreviewFromClassPathMetadata = processCustomAnnotationFromClasspath(roundEnvironment)
+        val customAnnotations = supportedCustomAnnotationTypes()
+        val customPreviewFromClassPathMetadata = customAnnotations.flatMap { processCustomAnnotationFromClasspath(roundEnvironment, it) }
         return (showkaseComposablesMetadata + previewComposablesMetadata + customPreviewFromClassPathMetadata)
             .dedupeAndSort()
             .toSet()
@@ -134,9 +135,9 @@ class ShowkaseProcessor @JvmOverloads constructor(
                 if (showkaseValidator.checkElementIsAnnotationClass(element)) {
                     // Writing preview data to a internal annotation to store values through
                     // processing rounds
-                    ShowkaseBrowserWriter(environment).writeCustomAnnotationElementToMetadata(
-                        element
-                    )
+//                    ShowkaseBrowserWriter(environment).writeCustomAnnotationElementToMetadata(
+//                        element
+//                    )
                     return@mapNotNull processCustomAnnotation(
                         skipPrivatePreviews = skipPrivatePreviews,
                         roundEnvironment = roundEnvironment,
@@ -157,13 +158,13 @@ class ShowkaseProcessor @JvmOverloads constructor(
             }.flatten().mapNotNull { it }.toSet()
     }
 
-    private fun processCustomAnnotation(
+    private fun processCustomAnnotationByName(
         skipPrivatePreviews: Boolean,
         roundEnvironment: XRoundEnv,
-        annotation: XTypeElement? = null
+        annotationQualifiedName: String? = null
     ): Set<ShowkaseMetadata.Component> {
         val supportedTypes = mutableListOf<String>()
-        if (annotation != null) supportedTypes.add(annotation.qualifiedName)
+        if (annotationQualifiedName != null) supportedTypes.add(annotationQualifiedName)
         val components = mutableSetOf<ShowkaseMetadata.Component>()
 
         supportedTypes.map { supportedType ->
@@ -191,67 +192,24 @@ class ShowkaseProcessor @JvmOverloads constructor(
         return components
     }
 
+    private fun processCustomAnnotation(
+        skipPrivatePreviews: Boolean,
+        roundEnvironment: XRoundEnv,
+        annotation: XTypeElement? = null
+    ): Set<ShowkaseMetadata.Component> {
+        return processCustomAnnotationByName(skipPrivatePreviews, roundEnvironment, annotation?.qualifiedName)
+    }
+
     private fun String.getCustomAnnotationSimpleName(): String {
         return this.split(".").last()
     }
 
-    private fun processCustomAnnotationFromClasspath(roundEnvironment: XRoundEnv): Set<ShowkaseMetadata.Component> {
-        // In this function we are checking generated classpath for MultiPreview codegen annotations.
-        // We also check the current module if there is any composables that are annotated with the qualified name
-        // from the annotation from classpath. We use the fields from the classpath annotation to build
-        // common data for the ShowkaseMetadata.
-
-        val skipPrivatePreviews = environment.options["skipPrivatePreviews"] == "true"
-        // Supported annotations from classpath
-        val supportedCustomPreview = mutableSetOf<ShowkaseMultiPreviewCodegenMetadata>()
-        environment.getTypeElementsFromPackage(CODEGEN_PACKAGE_NAME)
-            .flatMap { it.getEnclosedElements() }.mapNotNull {
-                return@mapNotNull when (
-                    val annotation = it.getAnnotation(ShowkaseMultiPreviewCodegenMetadata::class)
-                ) {
-                    null -> {
-                        null
-                    }
-                    else -> {
-                        val codeGenAnnotation = ShowkaseMultiPreviewCodegenMetadata(
-                            previewName = annotation.value.previewName,
-                            previewGroup = annotation.value.previewGroup,
-                            supportTypeQualifiedName = annotation.value.supportTypeQualifiedName,
-                            packageName = annotation.value.packageName,
-                            showkaseWidth = annotation.value.showkaseWidth,
-                            showkaseHeight = annotation.value.showkaseHeight,
-                        )
-                        supportedAnnotationTypes.add(annotation.value.supportTypeQualifiedName)
-                        supportedCustomPreview.add(codeGenAnnotation)
-                    }
-                }
-            }
-        val components = mutableSetOf<ShowkaseMetadata.Component>()
-        supportedCustomPreview
-            .mapIndexed { index: Int, customPreviewMetadata: ShowkaseMultiPreviewCodegenMetadata ->
-                roundEnvironment
-                    .getElementsAnnotatedWith(customPreviewMetadata.supportTypeQualifiedName)
-                    .mapIndexed elementRoot@{ elementIndex, xElement ->
-                        val skippable = showkaseValidator.validateComponentElementOrSkip(
-                            xElement,
-                            customPreviewMetadata.supportTypeQualifiedName,
-                            skipPrivatePreviews = skipPrivatePreviews
-                        )
-                        if (!skippable) {
-                            components.add(
-                                getShowkaseMetadata(
-                                    xElement = xElement,
-                                    customPreviewMetadata = customPreviewMetadata,
-                                    elementIndex = elementIndex,
-                                    index = index,
-                                    showkaseValidator = showkaseValidator
-                                )
-                            )
-                        }
-
-                    }
-            }
-        return components
+    private fun processCustomAnnotationFromClasspath(roundEnvironment: XRoundEnv, annotationQualifiedName: String): Set<ShowkaseMetadata.Component> {
+        return processCustomAnnotationByName(
+            skipPrivatePreviews = environment.options["skipPrivatePreviews"] == "true",
+            roundEnvironment = roundEnvironment,
+            annotationQualifiedName = annotationQualifiedName
+        )
     }
 
     private fun writeMetadataFile(
